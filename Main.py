@@ -1,153 +1,128 @@
-# 1. Suppression des avertissements système (DeprecationWarning)
+# 1. Suppression des avertissements système (EN PREMIÈRE LIGNE)
 import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
-# 0. Installation des dépendances
-!pip install --upgrade crewai litellm google-generativeai yfinance python-dotenv duckduckgo-search -q
+# 2. Installation des dépendances (Commande Colab)
+!pip install --upgrade crewai litellm google-generativeai python-dotenv -q
 
 import os
 import nest_asyncio
-import yfinance as yf
-from duckduckgo_search import DDGS
+import urllib.parse
 from crewai import Agent, Task, Crew, LLM
 from crewai.tools import tool
 
-
-
-# 2. Gestion universelle de l'environnement (Local/Colab/Cloud)
+# 3. Gestion universelle de l'environnement (Local/Colab/Cloud)
 nest_asyncio.apply()
 
 try:
-
+    from google.colab import userdata
     os.environ["GEMINI_API_KEY"] = userdata.get('GEMINI_API_KEY')
-
     print("Environnement détecté : Google Colab")
 except ImportError:
     from dotenv import load_dotenv
     load_dotenv()
     print("Environnement détecté : Serveur Cloud / Local (via .env)")
 
-# 3. Initialisation du modèle
+# 4. Initialisation du modèle
 cerveau_gemini = LLM(
     model="gemini/gemini-3.5-flash-lite",
     api_key=os.environ["GEMINI_API_KEY"]
 )
 
 # ==========================================
-# 4. OUTILS DES AGENTS
+# 5. OUTIL DE CRÉATION D'IMAGES (Format Markdown)
 # ==========================================
-@tool("Outil de donnees de marche en direct")
-def obtenir_donnees_marche(ticker: str) -> str:
-    """Indispensable pour obtenir le vrai prix actuel et l'historique."""
-    print(f"\n📡 [Analyste Technique] -> Extraction des prix pour : {ticker}")
-    try:
-        actif = yf.Ticker(ticker)
-        historique = actif.history(period="5d")
-        if historique.empty: return "Aucune donnée trouvée."
-        prix_actuel = historique['Close'].iloc[-1]
-        resume = f"PRIX ACTUEL : {prix_actuel:.2f}\n" + historique[['Open', 'High', 'Low', 'Close']].to_string()
-        return resume
-    except Exception as e: return f"Erreur de flux : {str(e)}"
-
-@tool("Outil de recherche web actualites")
-def rechercher_actualites_macro(requete: str) -> str:
-    """Indispensable pour rechercher les actualités macroéconomiques et financières mondiales."""
-    print(f"\n📰 [Analyste Macro] -> Recherche web autonome : '{requete}'")
-    try:
-        resultats = ""
-        with DDGS() as ddgs:
-            for r in ddgs.text(requete + " actualités économie finance", max_results=5):
-                resultats += f"- Titre : {r['title']}\n- Résumé : {r['body']}\n\n"
-        if not resultats: return "Aucune actualité récente trouvée."
-        return resultats
-    except Exception as e: return f"Erreur réseau : {str(e)}"
+@tool("Generateur d'images IA")
+def generer_image(description_anglaise: str) -> str:
+    """
+    Outil utilisé pour générer une image à partir d'un prompt visuel en anglais.
+    Retourne l'image au format Markdown pour qu'elle s'affiche directement.
+    """
+    print(f"\n🎨 [Le Designer génère l'image] -> Prompt : {description_anglaise}")
+    prompt_formate = urllib.parse.quote(description_anglaise)
+    url_image = f"https://image.pollinations.ai/prompt/{prompt_formate}"
+    
+    # C'est cette syntaxe Markdown qui permet l'affichage direct de l'image
+    return f"![Visuel de la publication]({url_image})"
 
 # ==========================================
-# 5. LES AGENTS
+# 6. LES AGENTS
 # ==========================================
-analyste_technique = Agent(
-    role='Analyste Technique Senior',
-    goal='Analyser l\'action des prix RÉELS, identifier la liquidité et les zones OTE.',
-    backstory='Trader technique algorithmique. Tu te bases uniquement sur les chiffres exacts fournis par ton outil.',
+redacteur_contenu = Agent(
+    role='Copywriter et Expert Social Media',
+    goal='Rédiger des publications captivantes, professionnelles et virales.',
+    backstory='Tu es un expert en marketing digital. Tu sais structurer un post avec une accroche, un corps clair et un appel à l\'action.',
     llm=cerveau_gemini,
-    tools=[obtenir_donnees_marche],
     verbose=True,
     allow_delegation=False
 )
 
-analyste_fondamental = Agent(
-    role='Économiste et Analyste Macroéconomique',
-    goal='Scanner internet de façon autonome pour évaluer le climat géopolitique et économique.',
-    backstory='Expert des marchés globaux. Tu lis l\'actualité avec ton outil de recherche pour anticiper les mouvements institutionnels.',
+designer_graphique = Agent(
+    role='Directeur Artistique',
+    goal='Créer des visuels accrocheurs pour illustrer les publications.',
+    backstory='Tu es un graphiste de talent. Tu traduis le texte du rédacteur en un prompt visuel court en ANGLAIS, puis tu utilises ton outil pour générer le code de l\'image.',
     llm=cerveau_gemini,
-    tools=[rechercher_actualites_macro],
+    tools=[generer_image],
     verbose=True,
     allow_delegation=False
 )
 
-gestionnaire_risque = Agent(
-    role='Chief Risk Officer (CRO) & Quantitative Trader',
-    goal='Calculer au centime près le risque mathématique de la position et fournir une stratégie de gestion de position exhaustive.',
-    backstory='Responsable de la gestion des risques dans un hedge fund. Tu appliques la gestion du risque strictement. Tu refuses de faire des conclusions vagues.',
+community_manager = Agent(
+    role='Community Manager Senior',
+    goal='Assembler le texte et l\'image Markdown pour livrer le post final.',
+    backstory='Tu es le garant du rendu final. Tu t\'assures que le texte original est parfaitement préservé et que l\'image s\'affiche juste en dessous.',
     llm=cerveau_gemini,
     verbose=True,
     allow_delegation=False
 )
 
 # ==========================================
-# 6. CONFIGURATION DE COMPTE & BOT
+# 7. CONFIGURATION CLOUD / API
 # ==========================================
-ACTIF_CIBLE = "XAUUSD=X"
-CAPITAL_TOTAL_USD = 10000.0  # Capital du portefeuille en $
-POURCENTAGE_RISQUE_MAX = 1.0  # Risque maximal toléré par trade en %
+SUJET_CLIENT = "Comment l'automatisation par l'Intelligence Artificielle peut faire gagner du temps aux petites entreprises."
+PLATEFORME_CIBLE = "LinkedIn"
+TONALITE = "Professionnelle mais accessible, orientée solution."
 
 # ==========================================
-# 7. LES TÂCHES
+# 8. LES TÂCHES
 # ==========================================
-task_technique = Task(
-    description=f'1. Utilise ton outil de marché pour récupérer les prix de {ACTIF_CIBLE}.\n2. Établis les zones de support, résistance et le point d\'entrée idéal (OTE).',
-    expected_output='Rapport technique détaillé avec des prix exacts.',
-    agent=analyste_technique
-)
-
-task_fondamentale = Task(
-    description=f'1. Recherche l\'actualité économique et géopolitique récente pour {ACTIF_CIBLE}.\n2. Évalue l\'impact macroéconomique sur la tendance.',
-    expected_output='Rapport géopolitique et macroéconomique temps réel.',
-    agent=analyste_fondamental
-)
-
-task_decision = Task(
+task_redaction = Task(
     description=f'''
-    Analyse les rapports pour {ACTIF_CIBLE}.
-
-    PARAMÈTRES DE GESTION DU RISQUE DU COMPTE :
-    - Capital disponible : {CAPITAL_TOTAL_USD} $
-    - Risque maximal autorisé : {POURCENTAGE_RISQUE_MAX} %
-
-    CONSIGNES DE CALCUL ET DE RÉDACTION STRICTES :
-    1. CALCUL DU RISQUE EN USD : Risque Max ($) = Capital * (Risque% / 100).
-    2. DISTANCE DE STOP LOSS : Calcule la différence en points entre le prix d'entrée et le Stop Loss.
-    3. TAILLE DU LOT EXACTE : Calcule la taille de lot à ouvrir selon la formule du marché pour cet actif.
-    4. RATIO RISQUE / RENDEMENT (R:R) : Affiche la valeur exacte du ratio (ex: 1:2.5).
-    5. CONCLUSION ÉTENDUE : Rédige une section "Conduite du Trade" complète décrivant la gestion post-entrée (Break-Even, fermetures partielles, invalides géopolitiques).
+    Rédige une publication pour {PLATEFORME_CIBLE} sur le sujet suivant : "{SUJET_CLIENT}".
+    La tonalité doit être : {TONALITE}.
+    Structure requise : 1. Accroche 2. Développement (puces/tirets) 3. Appel à l'action.
     ''',
-    expected_output='Plan de trading institutionnel avec calculs de risque mathématiques et section de conduite détaillée.',
-    agent=gestionnaire_risque
+    expected_output='Le texte complet et structuré de la publication.',
+    agent=redacteur_contenu
+)
+
+task_design = Task(
+    description='Lis le texte du rédacteur. Rédige un prompt descriptif de 15 mots max en ANGLAIS, puis UTILISE ton outil pour générer l\'image.',
+    expected_output='Le résultat Markdown de l\'image générée.',
+    agent=designer_graphique
+)
+
+task_assemblage = Task(
+    description='Récupère le texte complet du Copywriter ET l\'image Markdown du Designer. Assemble les deux éléments.',
+    expected_output='Le livrable final : le texte en haut, suivi de l\'image formatée en Markdown `![Visuel](URL)` en bas. Ne donne aucun lien brut.',
+    agent=community_manager
 )
 
 # ==========================================
-# 8. EXÉCUTION DU SYSTÈME
+# 9. EXÉCUTION DU SYSTÈME
 # ==========================================
-equipe_trading = Crew(
-    agents=[analyste_technique, analyste_fondamental, gestionnaire_risque],
-    tasks=[task_technique, task_fondamentale, task_decision],
+equipe_reseaux_sociaux = Crew(
+    agents=[redacteur_contenu, designer_graphique, community_manager],
+    tasks=[task_redaction, task_design, task_assemblage],
     verbose=True
 )
 
-print(f"\n🚀 Calcul des risques et analyse globale pour : {ACTIF_CIBLE}...")
-resultat_trading = await equipe_trading.kickoff_async()
+print(f"\n🚀 Création du contenu en cours pour : '{SUJET_CLIENT}'...")
+resultat_publication = await equipe_reseaux_sociaux.kickoff_async()
 
 print("\n\n========================================")
-print(f"📊 PLAN DE TRADING & CALCUL DE RISQUE ({ACTIF_CIBLE}) :")
+print(f"📦 PACK CONTENU FINAL ({PLATEFORME_CIBLE}) :")
 print("========================================\n")
-print(resultat_trading)
+# L'affichage final interprétera le Markdown et affichera l'image dans un notebook compatible
+from IPython.display import display, Markdown
+display(Markdown(resultat_publication.raw))
