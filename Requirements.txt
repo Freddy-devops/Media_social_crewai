@@ -1,0 +1,6 @@
+crewai
+litellm
+google-generativeai
+yfinance
+python-dotenv
+nest_asyncio
